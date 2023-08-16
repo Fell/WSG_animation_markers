@@ -7,10 +7,10 @@ from io_scene_gltf2.blender.exp import gltf2_blender_search_node_tree
 
 bl_info = {
     "name": "Timeline markers Extension",
-    "extension_name": "WEBGI_animation_markers",
+    "extension_name": "WSG_animation_markers",
     "category": "GLTF Exporter",
-    "version": (1, 0, 0),
-    "blender": (2, 92, 0),
+    "version": (1, 0, 1),
+    "blender": (3, 4, 0),
     'location': 'File > Export > glTF 2.0',
     'description': 'Extension to export timeline markers and cameras in gltf.',
     'tracker_url': '',  # Replace with your issue tracker
@@ -127,6 +127,26 @@ class glTF2ExportUserExtension:
         self.cameras.clear()
 
         gltf2_scene.extensions[self.properties.extension_name] = self.Extension(
+            name=self.properties.extension_name,
+            extension={'markers': extMarkers},
+            required=extension_is_required)
+            
+    def gather_animation_hook(self, gltf2_animation, blender_action, blender_object, export_settings):
+        markers = blender_action.pose_markers
+        extMarkers = []
+        #fps = blender_scene.render.fps
+        fps = 60.0;
+        for marker in markers:
+            markerData = {'name': marker.name, 'frame': marker.frame, 'time': 1.0 * marker.frame / fps}
+            if marker.camera is not None:
+                camIndex = self.cameras[marker.camera.data.name]
+                if camIndex is not None:
+                    markerData['camera'] = camIndex
+            extMarkers.append(markerData)
+
+        self.cameras.clear()
+        
+        gltf2_animation.extensions[self.properties.extension_name] = self.Extension(
             name=self.properties.extension_name,
             extension={'markers': extMarkers},
             required=extension_is_required)
