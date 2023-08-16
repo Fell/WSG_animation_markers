@@ -6,17 +6,17 @@ from io_scene_gltf2.blender.exp import gltf2_blender_gather_texture_info
 from io_scene_gltf2.blender.exp import gltf2_blender_search_node_tree
 
 bl_info = {
-    "name": "Timeline markers Extension",
+    "name": "Timeline markers extension",
     "extension_name": "WSG_animation_markers",
     "category": "GLTF Exporter",
     "version": (1, 0, 1),
     "blender": (3, 4, 0),
     'location': 'File > Export > glTF 2.0',
-    'description': 'Extension to export timeline markers and cameras in gltf.',
+    'description': 'Extension to export timeline markers and cameras in glTF',
     'tracker_url': '',  # Replace with your issue tracker
     'isDraft': False,
-    'developer': "Palash Bansal",
-    'url': 'https://repalash.com',
+    'developer': "Palash Bansal, Felix Urbasik",
+    'url': 'https://winningstreakgames.de',
 }
 
 # https://github.com/KhronosGroup/glTF-Blender-IO/tree/master/example-addons/example_gltf_extension
