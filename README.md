@@ -21,16 +21,15 @@ This is neccesary to work with Blender 3.6.0, because the hooks provided the glT
 
 In the resulting glTF file, the pose markers can be found under `extras` like so:
 ```json
-...
-"animations":[
-    {
-        "name":"CubeAction",
-        "extras":{
-            "marker1":1.0333333333333334,
-            "marker2":1.2833333333333334
-        },
-        ...
-    }
-],
-...
+{
+    "animations": [
+        {
+            "name":"CubeAction",
+            "extras": {
+                "marker1": 1.0333333333333334,
+                "marker2": 1.2833333333333334
+            }
+        }
+    ]
+}
 ```
