@@ -1,43 +1,24 @@
 import bpy
-import io_scene_gltf2.io.com.gltf2_io
-from io_scene_gltf2.blender.exp.gltf2_blender_gather_cameras import gather_camera
-from io_scene_gltf2.blender.exp import gltf2_blender_get
-from io_scene_gltf2.blender.exp import gltf2_blender_gather_texture_info
-from io_scene_gltf2.blender.exp import gltf2_blender_search_node_tree
 
 bl_info = {
-    "name": "Timeline markers extension",
+    "name": "Markers to extras",
     "extension_name": "WSG_animation_markers",
     "category": "GLTF Exporter",
-    "version": (1, 0, 1),
-    "blender": (3, 4, 0),
+    "version": (1, 1, 0),
+    "blender": (3, 6, 0),
     'location': 'File > Export > glTF 2.0',
-    'description': 'Extension to export timeline markers and cameras in glTF',
-    'tracker_url': '',  # Replace with your issue tracker
+    'description': 'Copies pose markers to custom properties when exporting as glTF.',
+    'tracker_url': 'https://github.com/Fell/WSG_animation_markers/issues',  # Replace with your issue tracker
     'isDraft': False,
-    'developer': "Palash Bansal, Felix Urbasik",
+    'developer': "Winning Streak Games GmbH",
     'url': 'https://winningstreakgames.de',
 }
-
-# https://github.com/KhronosGroup/glTF-Blender-IO/tree/master/example-addons/example_gltf_extension
-
-# glTF extensions are named following a convention with known prefixes.
-# See: https://github.com/KhronosGroup/glTF/tree/master/extensions#about-gltf-extensions
-# also: https://github.com/KhronosGroup/glTF/blob/master/extensions/Prefixes.md
-
-extension_is_required = False
-
 
 class TimelineMarkersExtensionProperties(bpy.types.PropertyGroup):
     enabled: bpy.props.BoolProperty(
         name=bl_info["name"],
-        description='Include this extension in the exported glTF file.',
+        description='Copy pose markers to custom properties when exporting',
         default=True
-    )
-    extension_name: bpy.props.StringProperty(
-        name="Extension",
-        description='GLTF extension name.',
-        default=bl_info["extension_name"]
     )
 
 def register():
@@ -45,12 +26,20 @@ def register():
     bpy.types.Scene.TimelineMarkersExtensionProperties = bpy.props.PointerProperty(type=TimelineMarkersExtensionProperties)
 
 def register_panel():
+    # Register the panel on demand, we need to be sure to only register it once
+    # This is necessary because the panel is a child of the extensions panel,
+    # which may not be registered when we try to register this extension
     try:
         bpy.utils.register_class(GLTF_PT_TimelineMarkersExtensionPanel)
     except Exception:
         pass
+    
+    # If the glTF exporter is disabled, we need to unregister the extension panel
+    # Just return a function to the exporter so it can unregister the panel
+    return unregister_panel
 
 def unregister_panel():
+    # Since panel is registered on demand, it is possible it is not registered
     try:
         bpy.utils.unregister_class(GLTF_PT_TimelineMarkersExtensionPanel)
     except Exception:
@@ -60,7 +49,6 @@ def unregister():
     unregister_panel()
     bpy.utils.unregister_class(TimelineMarkersExtensionProperties)
     del bpy.types.Scene.TimelineMarkersExtensionProperties
-
 
 class GLTF_PT_TimelineMarkersExtensionPanel(bpy.types.Panel):
 
@@ -88,11 +76,9 @@ class GLTF_PT_TimelineMarkersExtensionPanel(bpy.types.Panel):
         props = bpy.context.scene.TimelineMarkersExtensionProperties
         layout.active = props.enabled
 
-        box = layout.box()
-        box.label(text=props.extension_name)
-
-        layout.prop(props, 'extension_name', text="GLTF extension name")
-
+        #box = layout.box()
+        layout.label(text="Exporting custom properties will be forced")
+        layout.label(text="when this extension is enabled.")
 
 class glTF2ExportUserExtension:
 
@@ -102,57 +88,44 @@ class glTF2ExportUserExtension:
         from io_scene_gltf2.io.com.gltf2_io_extensions import Extension
         self.Extension = Extension
         self.properties = bpy.context.scene.TimelineMarkersExtensionProperties
-        self.cameras = {}
+  
+    def gather_scene_hook(self, gltf2_scene, blender_scene, export_settings):
+        if self.properties.enabled:
+            export_settings['gltf_extras'] = True;
 
+            VALID_NAMES = ['move_start','move_stop','ball_contact']
+            invalid_names = []
 
-    def gather_camera_hook(self, gltf2_camera: io_scene_gltf2.io.com.gltf2_io.Camera, blender_camera: bpy.types.Camera, export_settings):
-        self.cameras[blender_camera.name] = gltf2_camera
-        if blender_camera.sensor_fit == 'AUTO':
-            if gltf2_camera.extras is None:
-                gltf2_camera.extras = {}
-            gltf2_camera.extras['autoAspect'] = True
+            for action in bpy.data.actions:
+                for key in list(action.keys()):
+                    del action[key]
 
-    def gather_scene_hook(self, gltf2_scene: io_scene_gltf2.io.com.gltf2_io.Scene, blender_scene: bpy.types.Scene, export_settings):
-        markers = blender_scene.timeline_markers
-        extMarkers = []
-        fps = blender_scene.render.fps
-        for marker in markers:
-            markerData = {'name': marker.name,'frame': marker.frame, 'time': 1.0 * marker.frame / fps}
-            if marker.camera is not None:
-                camIndex = self.cameras[marker.camera.data.name]
-                if camIndex is not None:
-                    markerData['camera'] = camIndex
-            extMarkers.append(markerData)
+                for marker in action.pose_markers:
+                    action[marker.name] = marker.frame / blender_scene.render.fps
 
-        self.cameras.clear()
-
-        gltf2_scene.extensions[self.properties.extension_name] = self.Extension(
-            name=self.properties.extension_name,
-            extension={'markers': extMarkers},
-            required=extension_is_required)
+                    if(marker.name not in VALID_NAMES and marker.name not in invalid_names):
+                        invalid_names.append(marker.name)
             
-    def gather_animation_hook(self, gltf2_animation, blender_action, blender_object, export_settings):
-        markers = blender_action.pose_markers
-        extMarkers = []
-        #fps = blender_scene.render.fps
-        fps = 60.0;
-        for marker in markers:
-            markerData = {'name': marker.name, 'frame': marker.frame, 'time': 1.0 * marker.frame / fps}
-            if marker.camera is not None:
-                camIndex = self.cameras[marker.camera.data.name]
-                if camIndex is not None:
-                    markerData['camera'] = camIndex
-            extMarkers.append(markerData)
-
-        self.cameras.clear()
-        
-        gltf2_animation.extensions[self.properties.extension_name] = self.Extension(
-            name=self.properties.extension_name,
-            extension={'markers': extMarkers},
-            required=extension_is_required)
+            if(len(invalid_names)):
+                message = "Unknown marker names: "
+                for name in invalid_names:
+                    message += name + ' '
+                
+                show_warning(message)
+    
+    def gather_gltf_hook(self, active_scene_idx, scenes, animations, export_settings):
+        if self.properties.enabled:
+            for action in bpy.data.actions:
+                for key in list(action.keys()):
+                    del action[key]
 
 
-def dump(obj):
+def debug_dump(obj):
     for attr in dir(obj):
         if hasattr( obj, attr ):
             print( "obj.%s = %s" % (attr, getattr(obj, attr)))
+
+def show_warning(message = "", title = "Warning", icon = 'ERROR'):
+    def draw(self, context):
+        self.layout.label(text=message)
+    bpy.context.window_manager.popup_menu(draw, title = title, icon = icon)
