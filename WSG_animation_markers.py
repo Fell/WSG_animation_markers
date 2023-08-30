@@ -4,7 +4,7 @@ bl_info = {
     "name": "Markers to extras",
     "extension_name": "WSG_animation_markers",
     "category": "GLTF Exporter",
-    "version": (1, 1, 0),
+    "version": (1, 2, 0),
     "blender": (3, 6, 0),
     'location': 'File > Export > glTF 2.0',
     'description': 'Copies pose markers to custom properties when exporting as glTF.',
@@ -91,16 +91,19 @@ class glTF2ExportUserExtension:
   
     def gather_scene_hook(self, gltf2_scene, blender_scene, export_settings):
         if self.properties.enabled:
-            export_settings['gltf_extras'] = True;
+            export_settings['gltf_extras'] = True
 
-            VALID_NAMES = ['move_start','move_stop','ball_contact']
+            VALID_NAMES = ['move_start','move_stop','ball_contact','ball_release','left_foot','right_foot']
             invalid_names = []
 
             for action in bpy.data.actions:
+
                 for key in list(action.keys()):
                     del action[key]
 
                 for marker in action.pose_markers:
+                    marker.name = marker.name.lower()
+
                     action[marker.name] = marker.frame / blender_scene.render.fps
 
                     if(marker.name not in VALID_NAMES and marker.name not in invalid_names):
